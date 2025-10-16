@@ -1,0 +1,48 @@
+* Queue definitions for Hogan Crypto Settlement POC
+* 
+* Transaction Request Queue
+DEFINE QLOCAL('TRANX.REQUEST') +
+       DESCR('Transaction requests from REST API') +
+       MAXDEPTH(10000) +
+       MAXMSGL(1048576) +
+       SHARE +
+       NOREPLACE
+
+* Settlement Notification Queue  
+DEFINE QLOCAL('SETTLE.NOTIFY') +
+       DESCR('Settlement notifications from Bitcoin network') +
+       MAXDEPTH(5000) +
+       MAXMSGL(1048576) +
+       SHARE +
+       NOREPLACE
+
+* Settlement Confirmation Queue
+DEFINE QLOCAL('SETTLE.CONFIRM') +
+       DESCR('Settlement confirmations for ledger finalization') +
+       MAXDEPTH(5000) +
+       MAXMSGL(1048576) +
+       SHARE +
+       NOREPLACE
+
+* Dead Letter Queue
+DEFINE QLOCAL('SYSTEM.DEAD.LETTER.QUEUE') +
+       DESCR('Dead letter queue for failed messages') +
+       MAXDEPTH(5000) +
+       MAXMSGL(4194304) +
+       SHARE +
+       REPLACE
+
+* Application Channel
+DEFINE CHANNEL('HOGAN.APP.SVRCONN') +
+       CHLTYPE(SVRCONN) +
+       TRPTYPE(TCP) +
+       DESCR('Server connection channel for Hogan applications') +
+       REPLACE
+
+* Start the channel initiator
+START CHINIT
+
+DISPLAY QLOCAL('TRANX.REQUEST')
+DISPLAY QLOCAL('SETTLE.NOTIFY') 
+DISPLAY QLOCAL('SETTLE.CONFIRM')
+DISPLAY CHANNEL('HOGAN.APP.SVRCONN')

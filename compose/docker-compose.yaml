@@ -1,0 +1,86 @@
+version: '3.8'
+
+services:
+  # IBM MQ
+  mq:
+    image: ibmcom/mq:latest
+    container_name: hogan-mq
+    environment:
+      LICENSE: accept
+      MQ_QMGR_NAME: QM1
+      MQ_APP_PASSWORD: passw0rd
+    ports:
+      - "1414:1414"
+      - "9443:9443"
+    volumes:
+      - ./mq:/mnt/mqm/data
+      - mq-data:/mnt/mqm
+    networks:
+      - hogan-net
+    healthcheck:
+      test: ["CMD", "runmqchk", "-w", "30", "-m", "QM1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Bitcoin Core (regtest)
+  bitcoind:
+    image: bitcoin/bitcoin:latest
+    container_name: hogan-bitcoind
+    environment:
+      BITCOIN_DATA: /data
+    command: >
+      bitcoind
+      -regtest
+      -server=1
+      -rpcuser=hoganuser
+      -rpcpassword=hoganpass
+      -rpcallowip=0.0.0.0/0
+      -rpcbind=0.0.0.0:18443
+      -zmqpubrawblock=tcp://0.0.0.0:28332
+      -zmqpubrawtx=tcp://0.0.0.0:28333
+      -txindex=1
+      -deprecatedrpc=accounts
+    ports:
+      - "18443:18443"
+      - "28332:28332"
+      - "28333:28333"
+    volumes:
+      - bitcoin-data:/data
+    networks:
+      - hogan-net
+    healthcheck:
+      test: ["CMD", "bitcoin-cli", "-regtest", "-rpcuser=hoganuser", "-rpcpassword=hoganpass", "getblockchaininfo"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # MQ Configuration
+  mq-config:
+    image: ibmcom/mq:latest
+    container_name: hogan-mq-config
+    depends_on:
+      mq:
+        condition: service_healthy
+    command: >
+      sh -c "
+        sleep 10 &&
+        runmqsc QM1 < /config/queue_definitions.mqsc
+      "
+    volumes:
+      - ./mq:/config
+    networks:
+      - hogan-net
+    restart: "no"
+
+volumes:
+  mq-data:
+    driver: local
+  bitcoin-data:
+    driver: local
+
+networks:
+  hogan-net:
+    driver: bridge
