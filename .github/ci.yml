@@ -1,0 +1,140 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-test-lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install linters
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+          curl -sL https://github.com/markdownlint/markdownlint/releases/latest/download/mdl_*.deb -o /tmp/mdl.deb || true
+          if [ -f /tmp/mdl.deb ]; then sudo dpkg -i /tmp/mdl.deb || true; fi
+          curl -sL https://github.com/hadolint/hadolint/releases/latest/download/hadolint-Linux-x86_64 -o /usr/local/bin/hadolint
+          chmod +x /usr/local/bin/hadolint
+
+      - name: Lint Bash (ShellCheck)
+        run: |
+          if ls scripts/*.sh >/dev/null 2>&1; then
+            shellcheck scripts/*.sh
+          else
+            echo "No bash scripts to lint."
+          fi
+
+      - name: Lint Markdown (mdl)
+        run: |
+          if command -v mdl >/dev/null 2>&1; then
+            mdl -g .
+          else
+            echo "mdl not installed; skipping markdown lint."
+          fi
+
+      - name: Lint Dockerfiles (Hadolint)
+        run: |
+          if ls **/Dockerfile* >/dev/null 2>&1; then
+            hadolint **/Dockerfile*
+          else
+            echo "No Dockerfiles to lint."
+          fi
+
+      - name: Build Java (skip tests for speed)
+        run: |
+          if [ -f java/pom.xml ]; then
+            mvn -q -DskipTests package -f java/pom.xml
+          else
+            echo "No Java pom.xml; skipping."
+          fi
+
+      - name: Validate JCL ↔ Bash parity
+        run: |
+          if [ -f jcl/validate.sh ]; then
+            bash jcl/validate.sh
+          else
+            echo "No jcl/validate.sh; skipping."
+          fi
+
+  # Optional: E2E job that brings up services and runs the pseudo-JCL jobs
+  e2e:
+    runs-on: ubuntu-latest
+    needs: build-test-lint
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Docker Compose
+        run: docker --version
+
+      - name: Start services (MQ + bitcoind)
+        run: |
+          if [ -f compose/docker-compose.yaml ]; then
+            docker compose -f compose/docker-compose.yaml up -d
+            docker compose -f compose/docker-compose.yaml ps
+          else
+            echo "compose/docker-compose.yaml missing; skipping services start."
+          fi
+
+      - name: Build Java
+        run: |
+          if [ -f java/pom.xml ]; then
+            mvn -q -DskipTests package -f java/pom.xml
+          else
+            echo "No Java pom.xml; skipping."
+          fi
+
+      - name: Build COBOL (dockerized) 
+        run: |
+          if [ -f cobol/build.sh ]; then
+            bash cobol/build.sh
+          else
+            echo "cobol/build.sh missing; skipping COBOL build."
+          fi
+
+      - name: Run HBANKTRX job
+        run: |
+          if [ -f scripts/hbanktrx.sh ]; then
+            bash scripts/hbanktrx.sh
+          else
+            echo "scripts/hbanktrx.sh missing; skipping."
+          fi
+
+      - name: Run HSETTLE job
+        run: |
+          if [ -f scripts/hsettle.sh ]; then
+            bash scripts/hsettle.sh
+          else
+            echo "scripts/hsettle.sh missing; skipping."
+          fi
+
+      - name: Run HFINAL job
+        run: |
+          if [ -f scripts/hfinal.sh ]; then
+            bash scripts/hfinal.sh
+          else
+            echo "scripts/hfinal.sh missing; skipping."
+          fi
+
+      - name: Upload audit artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: audit-report
+          path: cobol/data/audit_report.txt
+          if-no-files-found: warn

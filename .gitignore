@@ -1,0 +1,26 @@
+# Java
+**/target/
+*.iml
+.idea/
+.classpath
+.project
+.settings/
+
+# Node/JS (if you add a UI later)
+node_modules/
+dist/
+
+# COBOL build artifacts
+cobol/bin/
+cobol/data/*.txt
+cobol/data/*.dat
+
+# OS cruft
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Docker
+**/.env
