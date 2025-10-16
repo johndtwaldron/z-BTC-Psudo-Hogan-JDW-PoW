@@ -21,9 +21,8 @@ jobs:
       - name: Install linters
         run: |
           sudo apt-get update
-          sudo apt-get install -y shellcheck
-          curl -sL https://github.com/markdownlint/markdownlint/releases/latest/download/mdl_*.deb -o /tmp/mdl.deb || true
-          if [ -f /tmp/mdl.deb ]; then sudo dpkg -i /tmp/mdl.deb || true; fi
+          sudo apt-get install -y shellcheck ruby-full
+          sudo gem install mdl
           curl -sL https://github.com/hadolint/hadolint/releases/latest/download/hadolint-Linux-x86_64 -o /usr/local/bin/hadolint
           chmod +x /usr/local/bin/hadolint
 
