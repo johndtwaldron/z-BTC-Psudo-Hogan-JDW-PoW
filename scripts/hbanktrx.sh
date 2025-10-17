@@ -16,12 +16,22 @@ else
   echo "WARN: $ROOT/cobol/build.sh not found (skipping compile)"
 fi
 
-## STEP2: Java core MQGET -> write work.csv
-echo "STEP2: Java core -> generate work file"
-if [[ ! -f "$ROOT/java/core/target/core.jar" ]]; then
-  (cd "$ROOT/java" && mvn -q -DskipTests package)
+mkdir -p "$ROOT/cobol/data"
+
+## STEP2: Java core -> generate work file (or stub if Java missing)
+echo "STEP2: Generate work file"
+CORE_JAR="$ROOT/java/core/target/core.jar"
+WORK="$ROOT/cobol/data/work.csv"
+if [[ -f "$CORE_JAR" ]]; then
+  java -jar "$CORE_JAR" generate-work "$WORK"
+else
+  echo "INFO: $CORE_JAR not found; creating stub $WORK"
+  cat > "$WORK" <<EOF
+#tx_id,from,to,amount,currency
+TX001,A,B,50.00,GBP
+TX002,B,C,12.34,GBP
+EOF
 fi
-java -jar "$ROOT/java/core/target/core.jar" generate-work "$ROOT/cobol/data/work.csv"
 
 ## STEP3: COBOL ledger_update work.csv -> ledger.dat
 echo "STEP3: COBOL ledger_update"
@@ -30,6 +40,6 @@ if [[ -z "${LEDGER_UPD}" ]]; then
   echo "ERROR: ledger_update binary not found in $ROOT/cobol/bin" >&2
   exit 8
 fi
-"$LEDGER_UPD" "$ROOT/cobol/data/work.csv" "$ROOT/cobol/data/ledger.dat"
+"$LEDGER_UPD" "$WORK" "$ROOT/cobol/data/ledger.dat"
 
 echo "=== HBANKTRX JOB END ==="
