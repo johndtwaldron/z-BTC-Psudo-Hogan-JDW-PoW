@@ -37,3 +37,21 @@ bash jcl/validate.sh
 bash scripts/hbanktrx.sh
 bash scripts/hsettle.sh
 bash scripts/hfinal.sh
+```
+
+# Hogan-Style Crypto Settlement POC (Bash orchestration)
+
+**Goal:** COBOL/JCL mindset + IBM MQ + Java + Bitcoin regtest, fully runnable locally.
+
+## Quick start
+
+Prereqs: Docker, Git, Java 17+, Maven, Git Bash (on Windows).
+
+```bash
+docker compose -f compose/docker-compose.yaml up -d
+bash cobol/build.sh
+mvn -q -DskipTests package -f java/pom.xml
+bash scripts/hbanktrx.sh
+bash scripts/hsettle.sh
+bash scripts/hfinal.sh
+```

@@ -91,6 +91,34 @@ jobs:
             echo "compose/docker-compose.yaml missing; skipping services start."
           fi
 
+      - name: Wait for services to be healthy and show logs on failure
+        run: |
+          set -e
+          docker compose -f compose/docker-compose.yaml ps || true
+          docker compose -f compose/docker-compose.yaml logs --no-color --tail=50 || true
+
+          # Wait up to ~5 minutes for hogan-mq to become healthy
+          for i in $(seq 1 60); do
+            CID=$(docker compose -f compose/docker-compose.yaml ps -q hogan-mq)
+            if [ -z "$CID" ]; then
+              echo "hogan-mq container not found yet (attempt $i)."
+              sleep 5
+              continue
+            fi
+            STATUS=$(docker inspect --format='{{.State.Health.Status}}' "$CID" 2>/dev/null || echo "none")
+            echo "hogan-mq health status: $STATUS"
+            if [ "$STATUS" = "healthy" ]; then
+              echo "hogan-mq is healthy."
+              exit 0
+            fi
+            sleep 5
+          done
+
+          echo "hogan-mq failed to become healthy; dumping logs and ps:"
+          docker compose -f compose/docker-compose.yaml logs --no-color --tail=500 hogan-mq || true
+          docker compose -f compose/docker-compose.yaml ps --all || true
+          exit 1
+
       - name: Build Java
         run: |
           if [ -f java/pom.xml ]; then

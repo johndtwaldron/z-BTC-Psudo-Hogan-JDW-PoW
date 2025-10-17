@@ -4,6 +4,7 @@ services:
   # IBM MQ
   mq:
     image: ibmcom/mq:latest
+    # image: icr.io/ibm-messaging/mq:latest   # or your chosen tag
     container_name: hogan-mq
     environment:
       LICENSE: accept
@@ -18,10 +19,11 @@ services:
     networks:
       - hogan-net
     healthcheck:
-      test: ["CMD", "runmqchk", "-w", "30", "-m", "QM1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      # Consider MQ "ready" when queue manager shows Running
+      test: ["CMD-SHELL", "dspmq -o status | grep -q 'Running'"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
       start_period: 60s
 
   # Bitcoin Core (regtest)
