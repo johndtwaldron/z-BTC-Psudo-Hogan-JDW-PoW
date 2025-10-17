@@ -97,25 +97,27 @@ jobs:
           docker compose -f compose/docker-compose.yaml ps || true
           docker compose -f compose/docker-compose.yaml logs --no-color --tail=50 || true
 
-          # Wait up to ~5 minutes for hogan-mq to become healthy
+          SERVICE_MQ=mq
+
+          # Wait up to ~5 minutes for IBM MQ to become healthy
           for i in $(seq 1 60); do
-            CID=$(docker compose -f compose/docker-compose.yaml ps -q hogan-mq)
+            CID=$(docker compose -f compose/docker-compose.yaml ps -q "$SERVICE_MQ")
             if [ -z "$CID" ]; then
-              echo "hogan-mq container not found yet (attempt $i)."
+              echo "$SERVICE_MQ container not found yet (attempt $i)."
               sleep 5
               continue
             fi
             STATUS=$(docker inspect --format='{{.State.Health.Status}}' "$CID" 2>/dev/null || echo "none")
-            echo "hogan-mq health status: $STATUS"
+            echo "$SERVICE_MQ health status: $STATUS"
             if [ "$STATUS" = "healthy" ]; then
-              echo "hogan-mq is healthy."
+              echo "$SERVICE_MQ is healthy."
               exit 0
             fi
             sleep 5
           done
 
-          echo "hogan-mq failed to become healthy; dumping logs and ps:"
-          docker compose -f compose/docker-compose.yaml logs --no-color --tail=500 hogan-mq || true
+          echo "$SERVICE_MQ failed to become healthy; dumping logs and ps:"
+          docker compose -f compose/docker-compose.yaml logs --no-color --tail=500 "$SERVICE_MQ" || true
           docker compose -f compose/docker-compose.yaml ps --all || true
           exit 1
 

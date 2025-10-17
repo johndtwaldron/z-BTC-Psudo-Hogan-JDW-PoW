@@ -1,32 +1,25 @@
 version: '3.8'
 
 services:
-  # IBM MQ
   mq:
     image: ibmcom/mq:latest
-    # image: icr.io/ibm-messaging/mq:latest   # or your chosen tag
     container_name: hogan-mq
     environment:
       LICENSE: accept
       MQ_QMGR_NAME: QM1
-      MQ_APP_PASSWORD: passw0rd
+      # Optional (if you want app/admin passwords):
+      # MQ_ADMIN_PASSWORD: passw0rd
+      # MQ_APP_PASSWORD: app12345
     ports:
-      - "1414:1414"
-      - "9443:9443"
-    volumes:
-      - ./mq:/mnt/mqm/data
-      - mq-data:/mnt/mqm
-    networks:
-      - hogan-net
+      - "1414:1414"   # MQ listener
+      - "9443:9443"   # MQ web console
     healthcheck:
-      # Consider MQ "ready" when queue manager shows Running
       test: ["CMD-SHELL", "dspmq -o status | grep -q 'Running'"]
       interval: 10s
       timeout: 5s
       retries: 30
       start_period: 60s
 
-  # Bitcoin Core (regtest)
   bitcoind:
     image: bitcoin/bitcoin:latest
     container_name: hogan-bitcoind
@@ -35,15 +28,19 @@ services:
     command: >
       bitcoind
       -regtest
-      -server=1
+      -txindex=1
+      -fallbackfee=0.0002
+      -rpcbind=0.0.0.0
+      -rpcallowip=0.0.0.0/0
       -rpcuser=hoganuser
       -rpcpassword=hoganpass
-      -rpcallowip=0.0.0.0/0
-      -rpcbind=0.0.0.0:18443
       -zmqpubrawblock=tcp://0.0.0.0:28332
       -zmqpubrawtx=tcp://0.0.0.0:28333
-      -txindex=1
       -deprecatedrpc=accounts
+      -listen=1
+      -server=1
+      -printtoconsole=1
+      -rpcport=18443
     ports:
       - "18443:18443"
       - "28332:28332"
