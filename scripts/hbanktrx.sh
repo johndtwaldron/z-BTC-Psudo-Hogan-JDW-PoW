@@ -33,13 +33,9 @@ TX002,B,C,12.34,GBP
 EOF
 fi
 
-## STEP3: COBOL ledger_update work.csv -> ledger.dat
+## STEP3: COBOL ledger_update (run inside builder container)
 echo "STEP3: COBOL ledger_update"
-LEDGER_UPD="$(find "$ROOT/cobol/bin" -maxdepth 1 -type f -name 'ledger_update*' | head -n1 || true)"
-if [[ -z "${LEDGER_UPD}" ]]; then
-  echo "ERROR: ledger_update binary not found in $ROOT/cobol/bin" >&2
-  exit 8
-fi
-"$LEDGER_UPD" "$WORK" "$ROOT/cobol/data/ledger.dat"
+DOCKER_RUN="docker run --rm -v \"$ROOT\":/work jdw/cobol-builder bash -lc"
+$DOCKER_RUN "/work/cobol/bin/ledger_update /work/cobol/data/work.csv /work/cobol/data/ledger.dat"
 
 echo "=== HBANKTRX JOB END ==="
