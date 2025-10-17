@@ -5,6 +5,7 @@
 **Goal:** Demonstrate hybrid core-banking flow (COBOL/JCL mindset + MQ + Java + Bitcoin regtest) with modern CI/CD — all runnable locally on Windows (Git Bash/WSL), macOS, and Linux.
 
 ## What’s inside
+
 - **COBOL batch** (GnuCOBOL, dockerized) for ledger updates & finalization.
 - **Pseudo-JCL**: Real-looking `.JCL` members for readability, plus **Bash job drivers** that execute equivalent steps.
 - **Messaging**: IBM MQ (Developer image via Docker). Queues: `TRANX.REQUEST`, `SETTLE.NOTIFY`, `SETTLE.CONFIRM`.

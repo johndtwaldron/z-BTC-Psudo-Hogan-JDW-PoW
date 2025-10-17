@@ -1,4 +1,13 @@
-.PHONY: up build bank settle final e2e validate clean
+.PHONY: lint, up build bank settle final e2e validate clean
+
+lint-sh:
+\tshellcheck scripts/*.sh
+
+lint-md:
+\tmdl -g -c .mdlrc .
+
+lint-docker:
+\thadolint cobol/Dockerfile
 
 up:
 \tdocker compose -f compose/docker-compose.yaml up -d

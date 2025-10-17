@@ -25,6 +25,10 @@ jobs:
           sudo gem install mdl
           curl -sL https://github.com/hadolint/hadolint/releases/latest/download/hadolint-Linux-x86_64 -o /usr/local/bin/hadolint
           chmod +x /usr/local/bin/hadolint
+      
+      - name: Install markdownlint-cli (Node)
+        run: |
+          npm install -g markdownlint-cli
 
       - name: Lint Bash (ShellCheck)
         run: |
@@ -34,13 +38,12 @@ jobs:
             echo "No bash scripts to lint."
           fi
 
-      - name: Lint Markdown (mdl)
+      - name: Lint Markdown
         run: |
-          if command -v mdl >/dev/null 2>&1; then
-            mdl -g -c .mdlrc .
-          else
-            echo "mdl not installed; skipping markdown lint."
-          fi
+          # Ruby mdl with repo config (keeps parity with .mdlrc)
+          mdl -g -c .mdlrc .
+          # Also run markdownlint-cli for clearer, Windows-like output
+          markdownlint . --config .markdownlint.json
 
       - name: Lint Dockerfiles (Hadolint)
         run: |

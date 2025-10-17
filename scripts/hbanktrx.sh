@@ -35,7 +35,7 @@ fi
 
 ## STEP3: COBOL ledger_update (run inside builder container)
 echo "STEP3: COBOL ledger_update"
-DOCKER_RUN="docker run --rm -v \"$ROOT\":/work jdw/cobol-builder bash -lc"
-$DOCKER_RUN "/work/cobol/bin/ledger_update /work/cobol/data/work.csv /work/cobol/data/ledger.dat"
+docker_run=(docker run --rm -v "$ROOT":/work jdw/cobol-builder bash -lc)
+"${docker_run[@]}" "/work/cobol/bin/ledger_update /work/cobol/data/work.csv /work/cobol/data/ledger.dat"
 
 echo "=== HBANKTRX JOB END ==="
