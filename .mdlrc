@@ -1,0 +1,13 @@
+# .mdlrc
+rules "all"
+
+# Allow long lines in README prose (keeps CI quiet)
+exclude_rule "MD013"
+
+# Keep consistent nested list indentation at 2 spaces
+MD007:
+  indent: 2
+
+# (Optional) If you still have special cases of multiple H1s, you can allow it:
+# exclude_rule "MD025"
+# But it's better to fix headings so there is only one H1.
