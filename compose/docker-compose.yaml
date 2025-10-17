@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   mq:
     image: ibmcom/mq:latest
@@ -21,65 +19,17 @@ services:
       start_period: 60s
 
   bitcoind:
-    image: bitcoin/bitcoin:latest
-    container_name: hogan-bitcoind
-    environment:
-      BITCOIN_DATA: /data
-    command: >
-      bitcoind
-      -regtest
-      -txindex=1
-      -fallbackfee=0.0002
-      -rpcbind=0.0.0.0
-      -rpcallowip=0.0.0.0/0
-      -rpcuser=hoganuser
-      -rpcpassword=hoganpass
-      -zmqpubrawblock=tcp://0.0.0.0:28332
-      -zmqpubrawtx=tcp://0.0.0.0:28333
-      -deprecatedrpc=accounts
-      -listen=1
-      -server=1
-      -printtoconsole=1
-      -rpcport=18443
-    ports:
-      - "18443:18443"
-      - "28332:28332"
-      - "28333:28333"
-    volumes:
-      - bitcoin-data:/data
-    networks:
-      - hogan-net
-    healthcheck:
-      test: ["CMD", "bitcoin-cli", "-regtest", "-rpcuser=hoganuser", "-rpcpassword=hoganpass", "getblockchaininfo"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-
-  # MQ Configuration
-  mq-config:
-    image: ibmcom/mq:latest
-    container_name: hogan-mq-config
-    depends_on:
-      mq:
-        condition: service_healthy
-    command: >
-      sh -c "
-        sleep 10 &&
-        runmqsc QM1 < /config/queue_definitions.mqsc
-      "
-    volumes:
-      - ./mq:/config
-    networks:
-      - hogan-net
-    restart: "no"
-
-volumes:
-  mq-data:
-    driver: local
-  bitcoin-data:
-    driver: local
-
-networks:
-  hogan-net:
-    driver: bridge
+      image: bitcoin/bitcoin:latest
+      container_name: hogan-bitcoind
+      command: >
+        bitcoind -regtest=1 -txindex=1 -fallbackfee=0.0002 -rpcbind=0.0.0.0
+                -rpcallowip=0.0.0.0/0 -rpcuser=bitcoin -rpcpassword=bitcoin
+                -server=1 -printtoconsole=1 -rpcport=18443
+      ports:
+        - "18443:18443"
+      healthcheck:
+        test: ["CMD-SHELL", "bitcoin-cli -regtest -rpcuser=bitcoin -rpcpassword=bitcoin -rpcconnect=127.0.0.1 getblockcount >/dev/null 2>&1"]
+        interval: 10s
+        timeout: 5s
+        retries: 30
+        start_period: 20s
