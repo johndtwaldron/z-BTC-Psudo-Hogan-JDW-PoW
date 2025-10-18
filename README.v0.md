@@ -24,17 +24,17 @@ Prereqs: Docker, Git, Java 17+, Maven.
 Windows: run with **Git Bash** or **WSL**.
 
 ```bash
-# 1) start services (MQ + bitcoind)
+## 1) start services (MQ + bitcoind)
 docker compose -f compose/docker-compose.yaml up -d
 
-# 2) build COBOL & Java
+## 2) build COBOL & Java
 bash cobol/build.sh
 mvn -q -DskipTests package -f java/pom.xml
 
-# 3) optional: validate JCL <-> Bash parity
+## 3) optional: validate JCL <-> Bash parity
 bash jcl/validate.sh
 
-# 4) run the “jobs”
+## 4) run the “jobs”
 bash scripts/hbanktrx.sh
 bash scripts/hsettle.sh
 bash scripts/hfinal.sh
