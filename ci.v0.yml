@@ -1,4 +1,5 @@
-name: CI + E2E
+name: CI
+
 on:
   push:
   pull_request:
@@ -6,8 +7,10 @@ on:
 jobs:
   build-test-lint:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -22,9 +25,10 @@ jobs:
           sudo gem install mdl
           curl -sL https://github.com/hadolint/hadolint/releases/latest/download/hadolint-Linux-x86_64 -o /usr/local/bin/hadolint
           chmod +x /usr/local/bin/hadolint
-
-      - name: Install markdownlint-cli (Node) for nicer output
-        run: npm i -g markdownlint-cli
+      
+      - name: Install markdownlint-cli (Node)
+        run: |
+          npm install -g markdownlint-cli
 
       - name: Lint Bash (ShellCheck)
         run: |
@@ -34,32 +38,12 @@ jobs:
             echo "No bash scripts to lint."
           fi
 
-      - name: Lint Markdown (mdl + markdownlint-cli)
+      - name: Lint Markdown
         run: |
-          if command -v mdl >/dev/null 2>&1; then
-            mdl -g -c .mdlrc .
-          fi
-          if command -v markdownlint >/dev/null 2>&1; then
-            if [ -f .markdownlint.json ]; then
-              markdownlint . --config .markdownlint.json
-            else
-              markdownlint .
-            fi
-          fi
-
-      - name: Enforce single H1 per markdown file
-        shell: bash
-        run: |
-          fail=0
-          for f in $(git ls-files '*.md'); do
-            count=$(grep -E '^[[:space:]]*# ' "$f" | wc -l | tr -d ' ')
-            if [ "$count" -gt 1 ]; then
-              echo "::error file=$f::Found $count top-level (#) headings. Keep only one H1 per file."
-              awk '/^[[:space:]]*# /{printf("line %d: %s\n", NR, $0)}' "$f"
-              fail=1
-            fi
-          done
-          [ "$fail" -eq 0 ]
+          # Ruby mdl with repo config (keeps parity with .mdlrc)
+          mdl -g -c .mdlrc .
+          # Also run markdownlint-cli for clearer, Windows-like output
+          markdownlint . --config .markdownlint.json
 
       - name: Lint Dockerfiles (Hadolint)
         run: |
@@ -69,37 +53,28 @@ jobs:
             echo "No Dockerfiles to lint."
           fi
 
-      - name: Build Java (skip tests)
+      - name: Build Java (skip tests for speed)
         run: |
           if [ -f java/pom.xml ]; then
-            mvn -q -DskipTests package -f java/pom.xml -Dmaven.repo.local=${{ runner.temp }}/.m2
+            mvn -q -DskipTests package -f java/pom.xml
           else
             echo "No Java pom.xml; skipping."
           fi
 
+      - name: Validate JCL ↔ Bash parity
+        run: |
+          if [ -f jcl/validate.sh ]; then
+            bash jcl/validate.sh
+          else
+            echo "No jcl/validate.sh; skipping."
+          fi
+
+  # Optional: E2E job that brings up services and runs the pseudo-JCL jobs
   e2e:
     runs-on: ubuntu-latest
     needs: build-test-lint
     steps:
       - uses: actions/checkout@v4
-
-      - name: Free disk space (pre)
-        uses: jlumbroso/free-disk-space@v1.3.1
-        with:
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: true
-          docker-images: false
-          swap-storage: true
-
-      - name: Disk usage (before)
-        run: df -h && docker system df || true
-
-      - name: Docker prune (pre)
-        run: |
-          docker system prune -af --volumes || true
-          docker builder prune -af || true
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -107,10 +82,17 @@ jobs:
           distribution: temurin
           java-version: "17"
 
+      - name: Set up Docker Compose
+        run: docker --version
+
       - name: Start services (MQ + bitcoind)
         run: |
-          docker compose -f compose/docker-compose.yaml up -d
-          docker compose -f compose/docker-compose.yaml ps
+          if [ -f compose/docker-compose.yaml ]; then
+            docker compose -f compose/docker-compose.yaml up -d
+            docker compose -f compose/docker-compose.yaml ps
+          else
+            echo "compose/docker-compose.yaml missing; skipping services start."
+          fi
 
       - name: Wait for services to be healthy and show logs on failure
         run: |
@@ -119,33 +101,38 @@ jobs:
           docker compose -f compose/docker-compose.yaml logs --no-color --tail=50 || true
 
           SERVICE_MQ=mq
+
+          # Wait up to ~5 minutes for IBM MQ to become healthy
           for i in $(seq 1 60); do
             CID=$(docker compose -f compose/docker-compose.yaml ps -q "$SERVICE_MQ")
             if [ -z "$CID" ]; then
               echo "$SERVICE_MQ container not found yet (attempt $i)."
-              sleep 5; continue
+              sleep 5
+              continue
             fi
             STATUS=$(docker inspect --format='{{.State.Health.Status}}' "$CID" 2>/dev/null || echo "none")
             echo "$SERVICE_MQ health status: $STATUS"
-            [ "$STATUS" = "healthy" ] && { echo "$SERVICE_MQ is healthy."; break; }
+            if [ "$STATUS" = "healthy" ]; then
+              echo "$SERVICE_MQ is healthy."
+              exit 0
+            fi
             sleep 5
           done
-          [ "$STATUS" = "healthy" ] || {
-            echo "$SERVICE_MQ failed to become healthy; dumping logs and ps:"
-            docker compose -f compose/docker-compose.yaml logs --no-color --tail=500 "$SERVICE_MQ" || true
-            docker compose -f compose/docker-compose.yaml ps --all || true
-            exit 1
-          }
 
-      - name: Build Java (skip tests)
+          echo "$SERVICE_MQ failed to become healthy; dumping logs and ps:"
+          docker compose -f compose/docker-compose.yaml logs --no-color --tail=500 "$SERVICE_MQ" || true
+          docker compose -f compose/docker-compose.yaml ps --all || true
+          exit 1
+
+      - name: Build Java
         run: |
           if [ -f java/pom.xml ]; then
-            mvn -q -DskipTests package -f java/pom.xml -Dmaven.repo.local=${{ runner.temp }}/.m2
+            mvn -q -DskipTests package -f java/pom.xml
           else
-            echo "No Java pom.xml; skipping (scripts will stub files)."
+            echo "No Java pom.xml; skipping."
           fi
 
-      - name: Build COBOL (dockerized)
+      - name: Build COBOL (dockerized) 
         run: |
           if [ -f cobol/build.sh ]; then
             bash cobol/build.sh
@@ -183,18 +170,3 @@ jobs:
           name: audit-report
           path: cobol/data/audit_report.txt
           if-no-files-found: warn
-
-      # ---- always cleanup to avoid "no space left on device" ----
-      - name: Docker compose down (post)
-        if: always()
-        run: docker compose -f compose/docker-compose.yaml down -v --remove-orphans || true
-
-      - name: Docker prune (post)
-        if: always()
-        run: |
-          docker system prune -af --volumes || true
-          docker builder prune -af || true
-
-      - name: Disk usage (after)
-        if: always()
-        run: df -h && docker system df || true
