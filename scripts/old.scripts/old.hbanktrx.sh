@@ -22,42 +22,20 @@ mkdir -p "$ROOT/cobol/data"
 echo "STEP2: Generate work file"
 CORE_JAR="$ROOT/java/core/target/core.jar"
 WORK="$ROOT/cobol/data/work.csv"
-mkdir -p "$ROOT/cobol/data" "$ROOT/cobol/logs"
-
 if [[ -f "$CORE_JAR" ]]; then
   java -jar "$CORE_JAR" generate-work "$WORK"
 else
   echo "INFO: $CORE_JAR not found; creating stub $WORK"
-  cat > "$WORK" <<'EOF'
+  cat > "$WORK" <<EOF
 #tx_id,from,to,amount,currency
 TX001,A,B,50.00,GBP
 TX002,B,C,12.34,GBP
 EOF
 fi
 
-# Add a trailer and a final newline to satisfy picky batch readers
-echo "EOF" >> "$WORK"
-printf "\n" >> "$WORK"
-
-## STEP3: COBOL ledger_update (run inside builder with timeout + fallback)
+## STEP3: COBOL ledger_update (run inside builder container)
 echo "STEP3: COBOL ledger_update"
 docker_run=(docker run --rm -v "$ROOT":/work jdw/cobol-builder bash -lc)
-set +e
-timeout 90s "${docker_run[@]}" \
-  "/work/cobol/bin/ledger_update /work/cobol/data/work.csv /work/cobol/data/ledger.dat" \
-  2>&1 | tee "$ROOT/cobol/logs/ledger_update.log"
-rc=${PIPESTATUS[0]}
-set -e
-
-if [[ $rc -eq 124 ]]; then
-  echo "WARN: ledger_update timed out after 90s — creating stub ledger.dat and continuing."
-  echo "# ledger stub $(date -u)" > "$ROOT/cobol/data/ledger.dat"
-elif [[ $rc -ne 0 ]]; then
-  echo "WARN: ledger_update exited rc=$rc — creating stub ledger.dat and continuing."
-  echo "# ledger stub (rc=$rc) $(date -u)" > "$ROOT/cobol/data/ledger.dat"
-fi
-
-echo "Files after STEP3:"
-ls -l "$ROOT/cobol/data" || true
+"${docker_run[@]}" "/work/cobol/bin/ledger_update /work/cobol/data/work.csv /work/cobol/data/ledger.dat"
 
 echo "=== HBANKTRX JOB END ==="
